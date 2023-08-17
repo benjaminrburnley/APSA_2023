@@ -1,0 +1,304 @@
+---
+title: "APSA Outputs"
+format: html
+---
+```{r}
+#| include: false
+
+# setup
+library(tidyverse)
+library(stargazer)
+library(patchwork)
+```
+
+```{r}
+#| include: false
+
+# read in data and clean names 
+data = read_csv("omnibus.csv") 
+
+#subset data - select relvant variables and rename
+clean = data %>% 
+  dplyr::select(
+    LocationLatitude, LocationLongitude, Q332:Q337,Q362_2:Q362_5,Q370:Q375, Q2_1:Q2_4, `1_Q408_1`:`1_Q411_1`,`2_Q408_1`:`2_Q411_1`,`3_Q408_1`:`3_Q411_1`,`4_Q408_1`:`4_Q411_1`, `5_Q408_1`:`5_Q411_1`,Q1...137:Q14,Q383_1:Q383_8, Q1...169,Q423,Q448:Q457
+  ) %>% 
+  rename(
+    "lat" = "LocationLatitude",
+    "long" = "LocationLongitude",
+    "age" = "Q332",
+    "political_interest"= "Q333",
+    "latino" = "Q334",
+    "race" = "Q335",
+    "party_self_ident" = "Q336",
+    "party_other" = "Q336_4_TEXT",
+    "party_lean" = "Q337",
+    "therm_biden" = "Q362_2",
+    "therm_dem" = "Q362_3",
+    "therm_trump" = "Q362_4",
+    "therm_rep" = "Q362_5",
+    "interracial_marriage" = "Q370",
+    "racism" ="Q372",
+    "group_benefits" = "Q373",
+    "racial_diversity" = "Q374",
+    "race_education" = "Q375",
+    "group_1" = "Q2_1",
+    "group_2" = "Q2_2",
+    "group_3" = "Q2_3",
+    "group_4" = "Q2_4",
+    "trust_police_1" = "1_Q408_1",
+    "trust_experts_1" = "1_Q410_1",
+    "trust_politicians_1" = "1_Q411_1",
+    "trust_police_2" = "2_Q408_1", 
+    "trust_experts_2" = "2_Q410_1",
+    "trust_politicians_2" = "2_Q411_1",
+    "trust_police_3" = "3_Q408_1",
+    "trust_experts_3" = "3_Q410_1",
+    "trust_politicians_3" = "3_Q411_1",
+    "trust_police_4" = "4_Q408_1",
+    "trust_experts_4" = "4_Q410_1",
+    "trust_politicians_4" = "4_Q411_1",
+    "trust_police_5" = "5_Q408_1",
+    "trust_experts_5" = "5_Q410_1",
+    "trust_politicians_5" = "5_Q411_1",
+    "gov_response_1" = "Q1...137",
+    "gov_response_2" = "Q2...138",
+    "gov_response_3" = "Q3...139",
+    "gov_repsonse_4" = "Q4...140",
+    "pol_complex" = "Q5...141",
+    "trust_gov" = "Q6...142",
+    "pol_interest" = "Q7...143",
+    "participate_media" = "Q8...144",
+    "participate_campaign" = "Q9",
+    "participate_activism" = "Q10",
+    "running_interest" = "Q11...147",
+    "running_qualified" = "Q12",
+    "people_like_me" = "Q13",
+    "women_in_pol" = "Q14",
+    "MIST1" = "Q383_1",
+    "MIST2" = "Q383_2",
+    "MIST3" = "Q383_3",
+    "MIST4" = "Q383_4",
+    "MIST5" = "Q383_5",
+    "MIST6" = "Q383_6",
+    "MIST7" = "Q383_7",
+    "MIST8" = "Q383_8",
+    "state" = "Q1...169",
+    "platform" = "Q423",
+    "registered_vote" = "Q448",
+    "parents_us" = "Q449",
+    "born_us" = "Q450",
+    "gender_id" = "Q451...207",
+    "ideology" = "Q452",
+    "religion" = "Q453",
+    "religion_other" = "Q453_6_TEXT",
+    "religion_freq" = "Q454",
+    "income" = "Q455",
+    "education" = "Q456",
+    "employ" = "Q457"  
+  ) 
+```
+
+```{r}
+# create survey variables 
+## recoding MIST items so that 1 == correct response and 0 == incorrect response, adding up all correct responses
+survey = clean %>% 
+  mutate(mist_1 = if_else(MIST1 == "Fake News", 1, 0),
+         mist_2 = if_else(MIST2 == "Fake News", 1, 0),
+         mist_3 = if_else(MIST3 == "Fake News", 1, 0),
+         mist_4 = if_else(MIST4 == "Fake News", 1, 0),
+         mist_5 = if_else(MIST5 == "Real News", 1, 0),
+         mist_6 = if_else(MIST6 == "Real News", 1, 0),
+         mist_7 = if_else(MIST7 == "Real News", 1, 0),
+         mist_8 = if_else(MIST8 == "Real News", 1, 0),
+         mist_score = mist_1 + mist_2 + mist_3 + mist_4 + mist_5 + mist_6 + mist_7 + mist_8)
+
+mist = survey %>% 
+  filter(!is.na(mist_score)) %>% 
+  filter(!is.na(platform)) %>% 
+  filter(platform %in% c("Facebook", "Instagram", "Twitter", "Reddit", "TikTok")) %>% 
+  mutate(age = as.numeric(age)) %>% 
+  mutate(pol_int = if_else(political_interest == "Not at all interested in politics", 0, 
+                           if_else(political_interest == "Not that interested in politics", 1,
+                                   if_else(political_interest == "Somewhat interested in politics", 2, 3))))
+```
+
+```{r}
+# prep for models 
+regression = mist %>% 
+  dplyr::select(mist_score, platform, age, pol_int, education, income, party_self_ident, party_lean, ideology) %>% 
+  mutate(party = if_else(party_self_ident %in% c("Democrat", "Republican"), party_self_ident, 
+                         if_else(party_lean == "Closer to the Democratic Party", "Democrat",
+                                 if_else(party_lean == "Closer to the Republican Party", "Republican", "Independent"))),
+         educ = case_when(education == "Less than High School Degree" ~ 0,
+                          education == "High School Degree" ~ 1,
+                          education == "Some College" ~ 2,
+                          education == "2-Year College Degree" ~ 3,
+                          education == "4-Year College Degree" ~ 4, 
+                          education == "Post Graduate Degree (For example Masters, Ph.D.)" ~ 5, 
+                          TRUE ~ NA),
+         inc = case_when(income == "Under $20,000 a year" ~ 0,
+                         income == "Between $20,000-$40,000 a year" ~ 1,
+                         income == "Between $40,000-$60,000 a year" ~ 2,
+                         income == "Between $60,000-$80,000 a year" ~ 3,
+                         income == "Between $80,000-$120,000 a year" ~ 4,
+                         income == "Over $120,000 a year" ~ 5, 
+                         TRUE ~ NA),
+         republican = if_else(party == "Republican", 1, 0),
+         conservative = case_when(ideology == "Conservative" ~ 1, 
+                                  ideology == "Very conservative" ~ 1, 
+                                  ideology == "Somewhat conservative" ~ 1, 
+                                  TRUE ~ 0),
+         facebook = if_else(platform == "Facebook", 1, 0),
+         reddit = if_else(platform == "Reddit", 1, 0),
+         twitter = if_else(platform == "Twitter", 1, 0),
+         instagram = if_else(platform == "Instagram", 1, 0),
+         tiktok = if_else(platform == "TikTok", 1, 0),
+         text_based = if_else(platform %in% c("Facebook", "Twitter", "Reddit"), 1, 0)
+  )
+```
+
+# Figure 1 
+```{r}
+#| warning: false
+#| message: false
+ggplot(regression, aes(mist_score))+
+  geom_bar()+
+  labs(
+    title = "Cumulative Score on MIST-8",
+    x = "Number of Correct Responses",
+    y = "Count of Respondents"
+  )+
+  theme_bw()
+```
+# Figure 2 
+```{r}
+  ggplot(regression, aes(platform))+
+  geom_bar()+
+  theme_bw()+
+  labs(
+    title = "Distribution of Top Platform Usage",
+    y = "Count of Users"
+  )+
+  theme(
+    axis.title.x = element_blank()
+  )
+```
+# Figure 3 
+```{r}
+c1 = regression %>% 
+  filter(!is.na(education)) %>% 
+  mutate(education = if_else(education == "Post Graduate Degree (For example Masters, Ph.D.)", "Post Graduate Degree", education),
+         education = factor(education, levels = c("Less than High School Degree", "High School Degree", "Some College", "2-Year College Degree", "4-Year College Degree", "Post Graduate Degree"))) %>% 
+  ggplot(aes(education))+
+  geom_bar()+
+  coord_flip()+
+  labs(
+    title = "Education",
+    x = NULL,
+    y = "Count"
+  )+
+  theme_bw()+
+  theme(
+    axis.text.x = element_text(size = 6, angle = 0)
+  )
+
+c2 = regression %>% 
+  filter(!is.na(party)) %>% 
+  ggplot(aes(party))+
+  geom_bar()+
+  labs(
+    title = "Party ID",
+    x = NULL,
+    y = "Count"
+  )+
+  coord_flip()+
+  theme_bw()
+
+c3 = regression %>% 
+  ggplot(aes(age))+
+  geom_bar()+
+  coord_flip()+
+  labs(
+    title = "Age",
+    x = NULL,
+    y = "Count"
+  )+
+  theme_bw()
+
+c1+c2+c3
+```
+# Table 1 
+```{r}
+# correlation matrix 
+cor_matrix = cor(regression[,c("mist_score","facebook", "twitter","reddit","instagram","tiktok","pol_int","age","republican","educ","inc")], use = "complete.obs")
+
+stargazer(cor_matrix, type = "text")
+```
+
+# Figure 4
+```{r, echo = FALSE}
+mist %>% 
+  pivot_longer(cols = mist_1:mist_8, names_to = "item", values_to = "response") %>%
+  mutate(item = if_else(item == "mist_1", "Stock Prices",
+                        if_else(item == "mist_2", "Salary",
+                                if_else(item == "mist_3", "Vaccines",
+                                        if_else(item == "mist_4", "Disease",
+                                                if_else(item == "mist_5", "EU",
+                                                        if_else(item == "mist_6", "Waterbottles", 
+                                                                if_else(item == "mist_7", "Trump", "Global Warming")))))))) %>% 
+  mutate(item = factor(item,levels = c("Stock Prices","Salary","Vaccines","Disease", "EU", "Waterbottles",  "Trump", "Global Warming"))) %>% 
+  mutate(response = if_else(response == 1, "Correct", "Incorrect")) %>% 
+  ggplot(aes(response))+
+  geom_bar()+
+  facet_wrap(~item,nrow = 2, ncol = 4)+
+  theme_bw()+
+  labs(
+    x  = "Answer",
+    y = "# of Responses"
+  )
+```
+# Table 1 
+```{r}
+mist %>% 
+  group_by(platform) %>% 
+  summarize(N = n(), Average = round(mean(mist_score), 2), SD = round(sd(mist_score), 2), Min = min(mist_score), Max = max(mist_score))
+```
+# Table 2
+```{r}
+reg1 = lm(mist_score ~ platform, data = regression) 
+reg2 = lm(mist_score ~ platform + pol_int, data = regression)
+reg3 = lm(mist_score ~ platform + pol_int + republican, data = regression)
+reg4 = lm(mist_score ~ platform + pol_int + republican + age + educ + inc, data = regression)
+
+stargazer(reg1, reg2, reg3, reg4, type = "text")
+#stargazer(reg1, reg2, reg3, reg4)
+```
+# Table 3 
+```{r}
+# platform by platform models 
+fb_reg = lm(mist_score ~ facebook + pol_int + republican + age + educ + inc, data = regression)
+tw_reg = lm(mist_score ~ twitter + pol_int + republican + age + educ + inc, data = regression)
+re_reg = lm(mist_score ~ reddit + pol_int + republican + age + educ + inc, data = regression)
+ig_reg = lm(mist_score ~ instagram + pol_int + republican + age + educ + inc, data = regression)
+tt_reg = lm(mist_score ~ tiktok + pol_int + republican + age + educ + inc, data = regression)
+tb_reg = lm(mist_score ~ text_based + pol_int + republican + age + educ + inc, data = regression)
+
+stargazer(fb_reg, tw_reg, re_reg, ig_reg, tt_reg, tb_reg, type = "text")
+#stargazer(fb_reg, tw_reg, re_reg, ig_reg, tt_reg, tb_reg)
+```
+```{r}
+ggplot(regression, aes(facebook, reddit))+
+  geom_point(position = "jitter")+
+  geom_smooth()
+```
+# Stats in the paper 
+```{r}
+# what percent of each response was correct
+mist %>% 
+  select(mist_1:mist_8) %>% 
+  rowid_to_column() %>% 
+  pivot_longer(cols = mist_1:mist_8, names_to = "item") %>% 
+  group_by(item) %>% 
+  summarize(percent_right = mean(value))
+```
+
