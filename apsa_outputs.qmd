@@ -302,3 +302,21 @@ mist %>%
   summarize(percent_right = mean(value))
 ```
 
+```{r}
+ggplot(regression, aes(age, mist_score, color = factor(facebook)))+
+  geom_point(position = "jitter")+
+  geom_smooth(method = "lm", se = F)+
+  theme_minimal()+
+  labs(
+    color = "Facebook User"
+  )
+
+ggplot(regression, aes(age, mist_score, color = factor(reddit)))+
+  geom_point(position = "jitter")+
+  geom_smooth(method = "lm", se = F)+
+  theme_minimal()+
+  labs(
+    color = "Reddit User"
+  )
+```
+
