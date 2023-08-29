@@ -20,11 +20,12 @@ data = read_csv("omnibus.csv")
 #subset data - select relvant variables and rename
 clean = data %>% 
   dplyr::select(
-    LocationLatitude, LocationLongitude, Q332:Q337,Q362_2:Q362_5,Q370:Q375, Q2_1:Q2_4, `1_Q408_1`:`1_Q411_1`,`2_Q408_1`:`2_Q411_1`,`3_Q408_1`:`3_Q411_1`,`4_Q408_1`:`4_Q411_1`, `5_Q408_1`:`5_Q411_1`,Q1...137:Q14,Q383_1:Q383_8, Q1...169,Q423,Q448:Q457
+    LocationLatitude, LocationLongitude,Q1...76, Q332:Q337,Q362_2:Q362_5,Q370:Q375, Q2_1:Q2_4, `1_Q408_1`:`1_Q411_1`,`2_Q408_1`:`2_Q411_1`,`3_Q408_1`:`3_Q411_1`,`4_Q408_1`:`4_Q411_1`, `5_Q408_1`:`5_Q411_1`,Q1...137:Q14,Q383_1:Q383_8, Q1...169,Q423,Q448:Q457
   ) %>% 
   rename(
     "lat" = "LocationLatitude",
     "long" = "LocationLongitude",
+    "attention" = "Q1...76",
     "age" = "Q332",
     "political_interest"= "Q333",
     "latino" = "Q334",
@@ -102,7 +103,8 @@ clean = data %>%
 # create survey variables 
 ## recoding MIST items so that 1 == correct response and 0 == incorrect response, adding up all correct responses
 survey = clean %>% 
-  mutate(mist_1 = if_else(MIST1 == "Fake News", 1, 0),
+  filter(attention == "None of these") %>% # filter out individuals who failed the attention check
+  mutate(mist_1 = if_else(MIST1 == "Fake News", 1, 0),  # create dummy for correct answers for each MIST item
          mist_2 = if_else(MIST2 == "Fake News", 1, 0),
          mist_3 = if_else(MIST3 == "Fake News", 1, 0),
          mist_4 = if_else(MIST4 == "Fake News", 1, 0),
@@ -110,7 +112,10 @@ survey = clean %>%
          mist_6 = if_else(MIST6 == "Real News", 1, 0),
          mist_7 = if_else(MIST7 == "Real News", 1, 0),
          mist_8 = if_else(MIST8 == "Real News", 1, 0),
-         mist_score = mist_1 + mist_2 + mist_3 + mist_4 + mist_5 + mist_6 + mist_7 + mist_8)
+         fakes = mist_1 + mist_2 + mist_3 + mist_4, 
+         reals = mist_5 + mist_6 + mist_7 + mist_8,
+         guessed_all_fake = fakes == 4 & reals == 0,
+         mist_score = mist_1 + mist_2 + mist_3 + mist_4 + mist_5 + mist_6 + mist_7 + mist_8) # calculate total score 
 
 mist = survey %>% 
   filter(!is.na(mist_score)) %>% 
@@ -232,7 +237,7 @@ c1+c2+c3
 # correlation matrix 
 cor_matrix = cor(regression[,c("mist_score","facebook", "twitter","reddit","instagram","tiktok","pol_int","age","republican","educ","inc")], use = "complete.obs")
 
-stargazer(cor_matrix, type = "text")
+stargazer(cor_matrix)
 ```
 
 # Figure 4
@@ -270,8 +275,8 @@ reg2 = lm(mist_score ~ platform + pol_int, data = regression)
 reg3 = lm(mist_score ~ platform + pol_int + republican, data = regression)
 reg4 = lm(mist_score ~ platform + pol_int + republican + age + educ + inc, data = regression)
 
-stargazer(reg1, reg2, reg3, reg4, type = "text")
-#stargazer(reg1, reg2, reg3, reg4)
+#stargazer(reg1, reg2, reg3, reg4, type = "text")
+stargazer(reg1, reg2, reg3, reg4)
 ```
 # Table 3 
 ```{r}
@@ -283,8 +288,8 @@ ig_reg = lm(mist_score ~ instagram + pol_int + republican + age + educ + inc, da
 tt_reg = lm(mist_score ~ tiktok + pol_int + republican + age + educ + inc, data = regression)
 tb_reg = lm(mist_score ~ text_based + pol_int + republican + age + educ + inc, data = regression)
 
-stargazer(fb_reg, tw_reg, re_reg, ig_reg, tt_reg, tb_reg, type = "text")
-#stargazer(fb_reg, tw_reg, re_reg, ig_reg, tt_reg, tb_reg)
+#stargazer(fb_reg, tw_reg, re_reg, ig_reg, tt_reg, tb_reg, type = "text")
+stargazer(fb_reg, tw_reg, re_reg, ig_reg, tt_reg, tb_reg)
 ```
 ```{r}
 ggplot(regression, aes(facebook, reddit))+
